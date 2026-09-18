@@ -1,0 +1,375 @@
+{
+  "name": "HubSpot Lead Routing & Qualification Engine",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "1e796ed2-3577-4a79-b236-5bfec4fee3d4",
+        "options": {}
+      },
+      "id": "4f4c5a65-8014-433f-9b75-dfa252fb0df6",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "1e796ed2-3577-4a79-b236-5bfec4fee3d4"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "dfb27572-01ed-40e5-8ddd-147101474d17",
+              "name": "contact_id",
+              "value": "={{ $json.body.contact_id }}",
+              "type": "number"
+            },
+            {
+              "id": "1b7d75b7-7377-4022-a451-3735a5049afd",
+              "name": "email",
+              "value": "={{ $json.body.email }}",
+              "type": "string"
+            },
+            {
+              "id": "a9f64bf0-b327-43ed-b8c2-bc0fe781b16a",
+              "name": "company_size",
+              "value": "200",
+              "type": "string"
+            },
+            {
+              "id": "a29caf61-5445-401c-94dc-f0f093482c6d",
+              "name": "industry",
+              "value": "SaaS",
+              "type": "string"
+            },
+            {
+              "id": "bf164518-0613-4b32-9c1a-51285f6fc507",
+              "name": "enrichment_status",
+              "value": "={{ $json.body.enrichment_status }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "92a7c7b7-2eee-4870-bba3-310d9f694ce8",
+      "name": "Edit Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "40a7801c-7eeb-492b-94dc-3b5832d8d670",
+              "leftValue": "={{$json.body.enrichment_status}} === \"Pending\"",
+              "rightValue": "=null",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "59f44838-4055-43ea-93ff-017e3af1c65e",
+      "name": "If1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "let score = 0;\nif ($json.company_size > 50) score += 30;\nif ($json.industry === \"SaaS\") score += 20;\nreturn [{ json: { ...$json, icp_fit_score: score } }];"
+      },
+      "id": "625c3801-90d7-4ae0-950b-a267d964cca3",
+      "name": "Code in JavaScript",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "39c0a1e4-e610-4295-977d-612bc4064ad1",
+              "leftValue": "={{ $json.icp_fit_score }}",
+              "rightValue": 60,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0b9c77ef-e396-4078-a816-e351d6e95662",
+      "name": "If",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        896,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.hubapi.com/crm/v3/objects/contacts/{{$json.contact_id}}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"properties\": {\"icp_fit_score\": \"{{$json.icp_fit_score}}\", \"assigned_owner_reason\": \"Score >= 60, routed to Sales\", \"enrichment_status\": \"true\", \"lead_source\": \"Webhook Form\"}}",
+        "options": {}
+      },
+      "id": "243ed91c-1992-4226-afbc-4c1cf606f297",
+      "name": "HTTP Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1120,
+        -96
+      ],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "IiNKT4BK0oaFb4Pc",
+          "name": "HubSpot Service Key account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C09APJX79PZ",
+          "mode": "list",
+          "cachedResultName": "all-harrys-slack"
+        },
+        "text": "Sales - ICP score >",
+        "otherOptions": {}
+      },
+      "id": "42f13693-cbbe-4c88-a762-2027abee8527",
+      "name": "Send a message",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        1344,
+        -96
+      ],
+      "webhookId": "f046d4a9-73b1-498a-891c-a2eb459d3914",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "YthXGzHQ9GE7MgUT",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.hubapi.com/crm/v3/objects/contacts/{{$json.contact_id}}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"properties\": {\"icp_fit_score\": \"{{$json.icp_fit_score}}\", \"assigned_owner_reason\": \"Score 30-59, routed to Nurture\", \"enrichment_status\": \"true\", \"lead_source\": \"Webhook Form\"}}",
+        "options": {}
+      },
+      "id": "cfa5de18-5a30-4f0d-8895-f3f00e5cba67",
+      "name": "HTTP Request1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1120,
+        96
+      ],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "IiNKT4BK0oaFb4Pc",
+          "name": "HubSpot Service Key account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C09B03V6LMT",
+          "mode": "list",
+          "cachedResultName": "new-channel"
+        },
+        "text": "=New Marketing Lead for nurture - {{ $('If').item.json.email }}",
+        "otherOptions": {}
+      },
+      "id": "d41873a3-74aa-415a-8c95-61436b49fdc9",
+      "name": "Send a message1",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        1344,
+        96
+      ],
+      "webhookId": "03875dba-3907-430f-8420-e86401fc89a5",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "YthXGzHQ9GE7MgUT",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "996cd687-8620-46c2-af08-4d611fc9b2d1",
+      "name": "No Operation, do nothing",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        720,
+        144
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "68af384c-bd9c-41f4-9b08-04e8486a1475",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "2a7885fdad087db07e5887264b9e82451d2aebffdcaea133b72b086e4faa0c15"
+  },
+  "nodeGroups": [],
+  "id": "O1lTEevTGxB1fFd3",
+  "tags": []
+}
