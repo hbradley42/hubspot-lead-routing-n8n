@@ -1,0 +1,35 @@
+# Decision Logic — Lead Routing & Qualification Engine
+
+## Why these score thresholds (60 / 30)?
+
+These numbers are illustrative for this demo, not the result of real analysis.
+In a production setting, I wouldn't set thresholds like this from a standing
+start. I’d pull 3-6 months of historical data from lead generation to deal close, look at where
+conversion actually starts dropping off by company size and industry, and set
+the cutoff there instead of picking a round number. The point of this build
+is the engine mechanism, building out score, branch, route, log, not the specific weights,
+which should always be validated against real outcomes and reviewed periodically.
+
+## Duplicate / re-processing handling
+
+The `Enrichment Status` property exists specifically to stop the same
+contact being scored twice. Before the scoring logic runs, the workflow
+should check that this field is still `Pending`, if a contact is edited
+twice in quick succession (a common real-world case: someone fixes a typo
+in an email address seconds after form submission), the second webhook
+firing shouldn't trigger a second enrichment call, a second score, and a
+second Slack notification to the rep. Once scoring completes, the field
+flips to `Complete`, and any future edits to that contact are treated as
+updates rather than new leads to qualify.
+
+## What happens if enrichment fails
+
+This build uses a mock Set node in place of a real enrichment API, so
+failure isn't something I could actually test here. But it's worth being
+explicit about the intended behaviour: a real enrichment call can time out,
+rate-limit, or return an empty result if the company can't be matched. The
+workflow shouldn't silently score the lead as if `company_size` and
+`industry` were `0`/blank: that would misclassify a potentially good lead
+as disqualified. The correct behaviour is to route anything with a failed
+or empty enrichment result to a "needs manual review" queue instead of
+letting it fall through the automated scoring path.
